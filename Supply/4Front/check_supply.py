@@ -2,6 +2,8 @@ from turtle import end_fill
 from types import NoneType
 import numpy as np
 import openpyxl
+from openpyxl.styles import colors
+from openpyxl.styles import Font, Color, PatternFill, Border, Side, Alignment, Protection
 #from openpyxl import load_workbook
 import pandas as pd
 import os
@@ -70,12 +72,19 @@ def open_orders(mfg_part_num, maxrow, sheet):
             due.append(sheet.cell(row = k, column = 8).value)
     return [qty, due]
 
-def excel_read(datafile):
+def excel_read(datafile): # TO-DO Build a structure/class for these and append values instead of individual variables
+    partno_4Front = []
     datafile = './Supply/4Front/Inventory Files/' + datafile
     wb = openpyxl.load_workbook(datafile) 
     sheet = wb.active 
     maxrow = sheet.max_row
-    return [wb, sheet, maxrow]
+    for k in range(4,maxrow):
+        cell = sheet.cell(row = k, column = 2)
+        if (cell.value != None):
+            if k != 50:
+                if k != 74:
+                    partno_4Front.append(cell.value)
+    return [wb, sheet, maxrow, partno_4Front]
 
 def get_parts(maxrow, sheet):
     part_list = []
@@ -105,28 +114,78 @@ def eliminate_duplicates(dataset):
             final_dataset.append(dataset[k-1])
     return final_dataset
 
-file_4Front                             = xlsx_name()
-[wbk_4Front, sht_4Front, maxrow_4Front] = excel_read(file_4Front)
-part_list                               = get_parts(maxrow_4Front, sht_4Front)
-[qty, due]                              = open_orders(part_list[16], maxrow_4Front, sht_4Front)
-wbk                                     = openpyxl.load_workbook('./Supply/4Front/Summary.xlsx')
-wbksheet                                = wbk.active 
-sheet_names                             = get_sheets(part_list)
+def populate_data(sheet, part, partno_4Front): #  part_list, maxrow_4Front, sht_4Front
+    cell = sheet.cell(row = 1, column = 1)
+    cell.value = "Part:"
+    cell.font = Font(bold=True, color="c4262e")
+    cell = sheet.cell(row = 1, column = 2)
+    cell.value = str(part)
+
+    cell = sheet.cell(row = 2, column = 1)
+    cell.value = "Manufacturer:"
+    cell.font = Font(bold=True, color="c4262e")
+    cell = sheet.cell(row = 3, column = 1)
+    cell.value = "4Front #:"
+    cell.font = Font(bold=True, color="c4262e")
+    cell = sheet.cell(row = 3, column = 2)
+    cell.value = str(partno_4Front)
+    
+    cell = sheet.cell(row = 4, column = 1)
+    cell.value = "MONTH"
+    cell.font = Font(bold=True, color="ffffff")
+    cell.fill = PatternFill("solid", fgColor="c4262e")
+    cell = sheet.cell(row = 4, column = 2)
+    cell.value = "INVENTORY"
+    cell.font = Font(bold=True, color="ffffff")
+    cell.fill = PatternFill("solid", fgColor="c4262e")
+    cell = sheet.cell(row = 4, column = 3)
+    cell.value = "ORDERS"
+    cell.font = Font(bold=True, color="ffffff")
+    cell.fill = PatternFill("solid", fgColor="c4262e")
+
+    cell = sheet.cell(row = 5, column = 1)
+    cell.value = "9/1/2022"
+    cell.number_format = 'MM/DD/YYYY'
+    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    for k in range(6,45):
+        cell = sheet.cell(row = k, column = 1)
+        val = "A" + str(k-1)
+        cell.value = "=DATE(YEAR(" + val + "),MONTH(" + val + ")+1,DAY(" + val + "))"
+        cell.number_format = 'MM/DD/YYYY'
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        if k % 2 == 0:
+            for j in range(1, 4):
+                cell = sheet.cell(row = k, column = j)
+                cell.fill = PatternFill("solid", fgColor="9a9b9c")
+    return
 
 
-#for part in part_list:
-#    print(part)
-for sheet in sheet_names:
-    print(sheet)
 
+file_4Front                                                 = xlsx_name()
+[wbk_4Front, sht_4Front, maxrow_4Front, partno_4Front]      = excel_read(file_4Front)
+part_list                                                   = get_parts(maxrow_4Front, sht_4Front)
+[qty, due]                                                  = open_orders(part_list[16], maxrow_4Front, sht_4Front)
+wbk                                                         = openpyxl.load_workbook('./Supply/4Front/Summary.xlsx')
+sheet_names                                                 = get_sheets(part_list)
+
+"""
+At this point in the code, the following variables contain the following information:
+- wbk_4Front: The workbook that 4Front sends us
+- sht_4Front: The worksheets listed on the 4Front spreadsheet, typically only '4FS Planning Tool'
+- max_row_4Front: The total number of rows on the 4Front spreadsheet
+- part_list: the raw data part list from 4Front spreadsheet
+
+- wbk: the exporting spreadsheet to submit the data to
+- sheet_names: the adjusted sheet names where each sheet is a part
+"""
+
+
+
+print(sheet_names[41]) # test part of BZX84C18-7-F
+wbksheet = wbk[sheet_names[41]]
+populate_data(wbksheet, str(sheet_names[41]), partno_4Front[41])
 
 wbk.save('./Supply/4Front/Summary.xlsx')
 wbk.close()
-
-"""
-for k in parts: # critical components
-    [part_no, qty_per, qty_on_hand] = part_data(k, maxrow, sheet)
-    print(part_no)
-    print(qty_per)
-    print(qty_on_hand)
-    """
+wbk_4Front.close()
